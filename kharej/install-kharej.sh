@@ -13,10 +13,23 @@
 #   --move-ssh            let Hedioum relocate OpenSSH to its decoy port (default: off)
 #   --jitter-restart      install a randomized-restart timer (anti-fingerprinting)
 #   --bundle-dir DIR      where to write the Iran bundle (default: /root/iran-bundle)
+#   --listen-port N       SSH-mimic public port       (Hedioum default: 22)
+#   --decoy-port N        local decoy sshd port       (Hedioum default: 2022)
+#   --tls-port N          TLS mimic port
+#   --smtp-port N         SMTP mimic port             (Hedioum default: 587)
+#   --imap-port N         IMAP mimic port             (Hedioum default: 143)
+#   --smtps-port N        SMTPS mimic port            (Hedioum default: 465)
+#   --extra "FLAGS"       any other `setup-foreign` flags, passed through verbatim
+#   -y, --yes             never prompt; use flags/defaults only
+#
+# Run in a terminal without --yes and the script asks for every value
+# (press Enter to accept the default).
 #   -h, --help
 set -euo pipefail
 
 PERSONA="auto"; DOMAIN=""; MOVE_SSH=0; JITTER=0; BUNDLE="/root/iran-bundle"
+LISTEN_PORT=""; DECOY_PORT=""; TLS_PORT=""; SMTP_PORT=""; IMAP_PORT=""; SMTPS_PORT=""
+EXTRA=""; YES=0; JITTER_SET=0
 
 HEDIOUM_REPO="hedioum/Hedioum-Pool-Tunnel"
 XRAY_REPO="XTLS/Xray-core"
@@ -30,15 +43,52 @@ while [ $# -gt 0 ]; do
     --persona)        PERSONA="${2:?}"; shift 2;;
     --domain)         DOMAIN="${2:?}"; shift 2;;
     --move-ssh)       MOVE_SSH=1; shift;;
-    --jitter-restart) JITTER=1; shift;;
+    --jitter-restart) JITTER=1; JITTER_SET=1; shift;;
     --bundle-dir)     BUNDLE="${2:?}"; shift 2;;
-    -h|--help)        sed -n "2,16p" "$0"; exit 0;;
+    --listen-port)    LISTEN_PORT="${2:?}"; shift 2;;
+    --decoy-port)     DECOY_PORT="${2:?}"; shift 2;;
+    --tls-port)       TLS_PORT="${2:?}"; shift 2;;
+    --smtp-port)      SMTP_PORT="${2:?}"; shift 2;;
+    --imap-port)      IMAP_PORT="${2:?}"; shift 2;;
+    --smtps-port)     SMTPS_PORT="${2:?}"; shift 2;;
+    --extra)          EXTRA="${2:?}"; shift 2;;
+    -y|--yes)         YES=1; shift;;
+    -h|--help)        sed -n "2,27p" "$0"; exit 0;;
     *) die "unknown option: $1";;
   esac
 done
 
 [ "$(id -u)" -eq 0 ] || die "run as root"
 command -v systemctl >/dev/null || die "systemd is required"
+
+valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
+port_free()  { ! ss -tln "( sport = :$1 )" 2>/dev/null | tail -n +2 | grep -q .; }
+ask()   { local var="$1" label="$2" cur="${!1}" ans; read -r -p "$label [${cur:-default}]: " ans || true; if [ -n "$ans" ]; then printf -v "$var" '%s' "$ans"; fi; return 0; }
+yesno() { local ans; read -r -p "$1 [y/N]: " ans || true; [[ "$ans" =~ ^[Yy] ]]; }
+
+if [ "$YES" -eq 0 ] && [ -t 0 ]; then
+  echo "Interactive setup — press Enter to keep the value in [brackets]."
+  ask PERSONA "Persona (auto|cpanel|directadmin|devops)"
+  ask DOMAIN  "Domain for Let's Encrypt (blank = self-signed)"
+  if yesno "Customize the public mimic ports?"; then
+    echo "(blank = Hedioum default)"
+    ask LISTEN_PORT "SSH-mimic port"
+    ask DECOY_PORT  "Local decoy sshd port"
+    ask TLS_PORT    "TLS mimic port"
+    ask SMTP_PORT   "SMTP mimic port"
+    ask IMAP_PORT   "IMAP mimic port"
+    ask SMTPS_PORT  "SMTPS mimic port"
+  fi
+  if [ "$JITTER_SET" -eq 0 ] && yesno "Install the randomized-restart timer?"; then JITTER=1; fi
+fi
+
+for pv in LISTEN_PORT DECOY_PORT TLS_PORT SMTP_PORT IMAP_PORT SMTPS_PORT; do
+  v="${!pv}"; [ -z "$v" ] && continue
+  valid_port "$v" || die "$pv: '$v' is not a valid port (1-65535)"
+  # the SSH-mimic port may legitimately be 22 only when --move-ssh frees it
+  port_free "$v" || { [ "$pv" = LISTEN_PORT ] && [ "$MOVE_SSH" -eq 1 ]; } \
+    || die "$pv: TCP port $v is already in use (ss -tlnp | grep :$v)"
+done
 
 case "$(uname -m)" in
   x86_64|amd64)  HED_ASSET="hedioum-tunnel";       XRAY_ASSET="Xray-linux-64.zip";;
@@ -73,6 +123,13 @@ cp -f /usr/local/bin/hedioum-tunnel "$BUNDLE/hedioum-tunnel"
 SETUP_ARGS=(--persona "$PERSONA" --public-ip "$PUBLIC_IP")
 [ -n "$DOMAIN" ]  && SETUP_ARGS+=(--domain "$DOMAIN")
 [ "$MOVE_SSH" -eq 1 ] && SETUP_ARGS+=(--move-ssh)
+[ -n "$LISTEN_PORT" ] && SETUP_ARGS+=(--listen-port "$LISTEN_PORT")
+[ -n "$DECOY_PORT" ]  && SETUP_ARGS+=(--decoy-port "$DECOY_PORT")
+[ -n "$TLS_PORT" ]    && SETUP_ARGS+=(--tls-port "$TLS_PORT")
+[ -n "$SMTP_PORT" ]   && SETUP_ARGS+=(--smtp-port "$SMTP_PORT")
+[ -n "$IMAP_PORT" ]   && SETUP_ARGS+=(--imap-port "$IMAP_PORT")
+[ -n "$SMTPS_PORT" ]  && SETUP_ARGS+=(--smtps-port "$SMTPS_PORT")
+if [ -n "$EXTRA" ]; then read -r -a EXTRA_ARR <<<"$EXTRA"; SETUP_ARGS+=("${EXTRA_ARR[@]}"); fi
 
 log "Configuring foreign node: hedioum-tunnel setup-foreign ${SETUP_ARGS[*]}"
 SETUP_OUT="$(/usr/local/bin/hedioum-tunnel setup-foreign "${SETUP_ARGS[@]}" 2>&1)" \

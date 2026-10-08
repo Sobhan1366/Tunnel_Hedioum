@@ -15,13 +15,18 @@
 #   --vless-port PORT   public VLESS+WS port (default: 2100)
 #   --ws-path PATH      WebSocket path (default: /hed-ssh)
 #   --uuid UUID         VLESS user id (default: generated)
+#   --random-port       pick a random free port (20000-60000) for the VLESS entry
 #   --jitter-restart    install a randomized-restart timer (anti-fingerprinting)
+#   -y, --yes           never prompt; use flags/defaults only
+#
+# Run in a terminal without --yes and the script asks for every value
+# (press Enter to accept the default).
 #   -h, --help
 set -euo pipefail
 
 BUNDLE="/root/iran-bundle"; TOKEN=""; ALIAS="KHAREJ"
 SOCKS_PORT=40001; VLESS_PORT=2100; WS_PATH="/hed-ssh"; UUID=""
-JITTER=0
+JITTER=0; JITTER_SET=0; YES=0; RANDOM_PORT=0
 
 log()  { printf '\033[1;32m[+]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*" >&2; }
@@ -36,8 +41,10 @@ while [ $# -gt 0 ]; do
     --vless-port)     VLESS_PORT="${2:?}"; shift 2;;
     --ws-path)        WS_PATH="${2:?}"; shift 2;;
     --uuid)           UUID="${2:?}"; shift 2;;
-    --jitter-restart) JITTER=1; shift;;
-    -h|--help)        sed -n "2,19p" "$0"; exit 0;;
+    --random-port)    RANDOM_PORT=1; shift;;
+    -y|--yes)         YES=1; shift;;
+    --jitter-restart) JITTER=1; JITTER_SET=1; shift;;
+    -h|--help)        sed -n "2,24p" "$0"; exit 0;;
     *) die "unknown option: $1";;
   esac
 done
@@ -48,12 +55,35 @@ command -v systemctl >/dev/null || die "systemd is required"
 [ -x "$BUNDLE/xray" ]           || die "missing $BUNDLE/xray"
 [ -n "$TOKEN" ] || { [ -r "$BUNDLE/pairing.token" ] && TOKEN="$(tr -d '[:space:]' < "$BUNDLE/pairing.token")"; }
 [ -n "$TOKEN" ] || die "no pairing token: pass --token or provide $BUNDLE/pairing.token"
-[ -n "$UUID" ]  || UUID="$(cat /proc/sys/kernel/random/uuid)"
 
-port_free() { ! ss -tln "( sport = :$1 )" | tail -n +2 | grep -q .; }
-for p in "$VLESS_PORT"; do
-  port_free "$p" || die "TCP port $p is already in use (check: ss -tlnp | grep :$p) — pick another with --vless-port"
-done
+valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
+port_free()  { ! ss -tln "( sport = :$1 )" 2>/dev/null | tail -n +2 | grep -q .; }
+ask()   { local var="$1" label="$2" cur="${!1}" ans; read -r -p "$label [${cur:-generate}]: " ans || true; if [ -n "$ans" ]; then printf -v "$var" '%s' "$ans"; fi; return 0; }
+yesno() { local ans; read -r -p "$1 [y/N]: " ans || true; [[ "$ans" =~ ^[Yy] ]]; }
+random_free_port() { local p; for _ in $(seq 1 50); do p=$((20000 + RANDOM % 40001)); port_free "$p" && { echo "$p"; return; }; done; die "no free random port found"; }
+
+if [ "$YES" -eq 0 ] && [ -t 0 ]; then
+  echo "Interactive setup — press Enter to keep the value in [brackets]."
+  if [ "$RANDOM_PORT" -eq 0 ]; then
+    ask VLESS_PORT "Public VLESS+WS port (type 'random' for a random free port)"
+    [ "$VLESS_PORT" = random ] && RANDOM_PORT=1
+  fi
+  ask WS_PATH    "WebSocket path"
+  ask SOCKS_PORT "Hedioum local SOCKS5 port (loopback only)"
+  ask ALIAS      "Hedioum node alias"
+  ask UUID       "VLESS UUID (blank = generate)"
+  if [ "$JITTER_SET" -eq 0 ] && yesno "Install the randomized-restart timer?"; then JITTER=1; fi
+fi
+
+[ "$RANDOM_PORT" -eq 1 ] && VLESS_PORT="$(random_free_port)"
+[ -n "$UUID" ] || UUID="$(cat /proc/sys/kernel/random/uuid)"
+case "$WS_PATH" in /*) ;; *) WS_PATH="/$WS_PATH";; esac
+valid_port "$VLESS_PORT" || die "VLESS port '$VLESS_PORT' is not valid (1-65535)"
+valid_port "$SOCKS_PORT" || die "SOCKS port '$SOCKS_PORT' is not valid (1-65535)"
+[ "$VLESS_PORT" != "$SOCKS_PORT" ] || die "VLESS port and SOCKS port must differ"
+[[ "$UUID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "UUID '$UUID' is not a valid UUID"
+port_free "$VLESS_PORT" || die "TCP port $VLESS_PORT is already in use (ss -tlnp | grep :$VLESS_PORT) — choose another or use --random-port"
+log "Using: VLESS :$VLESS_PORT  path $WS_PATH  SOCKS 127.0.0.1:$SOCKS_PORT  alias $ALIAS"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y -qq iproute2 python3 >/dev/null 2>&1 || warn "apt prerequisites skipped (offline?)"

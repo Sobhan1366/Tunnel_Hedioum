@@ -28,8 +28,19 @@ client (v2rayN, ...) --VLESS+WS--> Iran :2100 --Xray--> Hedioum SOCKS5 (127.0.0.
    The last lines contain the `vless://…` link (a fresh UUID is generated per install).
 3. Delete the bundle on both servers: `rm -rf /root/iran-bundle` (it holds the pairing token).
 
-Options: run each script with `--help`. Defaults: VLESS port `2100`, WS path `/hed-ssh`,
-Hedioum local SOCKS5 `127.0.0.1:40001` (loopback only).
+## Configuration
+
+Nothing is hard-wired. Run a script in a terminal and it asks for every value (Enter = default);
+add `-y` for unattended runs and pass values as flags instead.
+
+| Script | Flags |
+|---|---|
+| Iran | `--vless-port N` or `--random-port`, `--ws-path P`, `--socks-port N`, `--uuid U`, `--alias NAME`, `--jitter-restart` |
+| Foreign | `--persona`, `--domain`, `--listen-port`, `--decoy-port`, `--tls-port`, `--smtp-port`, `--imap-port`, `--smtps-port`, `--move-ssh`, `--extra "any other setup-foreign flags"`, `--jitter-restart` |
+
+Defaults: VLESS `2100`, path `/hed-ssh`, local SOCKS5 `127.0.0.1:40001` (loopback only). Ports are
+validated and checked for conflicts before anything is changed. The Iran side learns the foreign
+mimic ports from the pairing token, so only the foreign script needs them.
 
 ## Notes
 
