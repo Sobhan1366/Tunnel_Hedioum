@@ -1,5 +1,7 @@
 # Tunnel_Hedioum
 
+> 🔰 **New here? Start with the beginner guides:** [فارسی — راهنمای قدم‌به‌قدم](docs/GUIDE-FA.md) · [English — step-by-step](docs/GUIDE-EN.md)
+
 Scripts and field notes for an **Iran hub ⇄ foreign exit** tunnel built on
 [Hedioum Pool Tunnel](https://github.com/hedioum/Hedioum-Pool-Tunnel):
 
@@ -13,6 +15,9 @@ client --VLESS--> Iran hub (Xray / 3x-ui) --SOCKS5--> Hedioum hub
 | `tools/check-foreign.sh` | **Iran hub** | tells you in ~2 minutes whether a candidate foreign server is usable (run this *before* installing anything) |
 | `kharej/install-kharej.sh` | foreign server | installs Hedioum (foreign), creates the pairing token, bundles Xray for the hub |
 | `iran/install-iran.sh` | Iran hub | pairs with the foreign node and exposes a VLESS+WS entry point |
+| `panel/install-panel.sh` | Iran hub | installs the 3x-ui panel (online or **offline tarball**), wires it to Hedioum, creates a Reality inbound |
+| `panel/add-user.sh` · `list-users.sh` · `show-link.sh` · `remove-user.sh` | Iran hub | create users (data limit, expiry, monthly auto-renew), list usage, print links, delete |
+| `docs/GUIDE-FA.md` · `docs/GUIDE-EN.md` | — | very simple step-by-step guides for beginners |
 | `docs/LESSONS.md` | — | everything we learned the hard way (read it) |
 
 ## 1. Pick the server first — `tools/check-foreign.sh`
@@ -79,6 +84,8 @@ Trade-offs and limits:
 
 ## 4. Many users with quotas — 3x-ui (Sanaei) panel
 
+**Easy way:** `bash panel/install-panel.sh --tarball x-ui-linux-amd64.tar.gz --socks-port 40001` then `bash panel/add-user.sh ali --monthly 30` (30 GB/month, auto-renews every 30 days) or `bash panel/add-user.sh me` (unlimited). Full walkthrough: [docs/GUIDE-EN.md](docs/GUIDE-EN.md). The manual notes below explain what the scripts do.
+
 Per-user data caps only work for inbounds **managed by the panel**; links served by a plain
 Xray process (like the one `install-iran.sh` sets up) have no quotas.
 
@@ -111,7 +118,7 @@ spare foreign server, and rotate servers if one gets throttled.
 
 The scripts come from a manually built and repeatedly tested setup. `install-kharej.sh` was run
 end-to-end on several fresh servers and `install-iran.sh` on a hub, with fixes along the way;
-`check-foreign.sh` is validated only on the "good" side (see §1). Test on a throw-away pair first.
+`check-foreign.sh` is validated only on the "good" side (see §1). The panel scripts were tested end-to-end on a clean server (offline install, one-command fresh install, users with and without limits, each user connecting with its own link, removal) in `--direct` test mode; through a real Hedioum hub they were verified by hand. Test on a throw-away pair first.
 
 ---
 

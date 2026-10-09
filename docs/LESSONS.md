@@ -62,3 +62,12 @@ consistent copy before editing its database by hand; email is UNIQUE across all 
 Per-user speed is bounded by the hub/path, not by the number of tunnels: extra nodes to the same
 foreign server did not add throughput. Measure with parallel *completed* downloads, one node at a
 time, then both together.
+
+## Script-writing traps found while testing the panel scripts
+* `set -o pipefail` + `tr -dc … </dev/urandom | head -c N` exits with SIGPIPE (141) and `set -e` kills the script silently
+  right after the previous log line. Generate random strings with Python instead.
+* A fresh 3x-ui database has **no** `xrayTemplateConfig` row until the panel saves one from the UI; derive it from the panel's running
+  `bin/config.json` (keep only the `api` inbound) and insert it.
+* The offline release archive unpacks to a top-level `x-ui/` folder; the systemd unit and `x-ui.sh` ship inside it
+  (`x-ui.service.debian` on Ubuntu). `x-ui setting -username … -password … -port … -webBasePath …` creates the database and the login.
+* Editing the panel database while the panel runs races with it: backup (SQLite backup API), stop, edit, start, then check the running config.
