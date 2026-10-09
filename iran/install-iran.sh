@@ -15,6 +15,9 @@
 #   --vless-port PORT   public VLESS+WS port (default: 2100)
 #   --ws-path PATH      WebSocket path (default: /hed-ssh)
 #   --uuid UUID         VLESS user id (default: generated)
+#   --bw MBPS           per-connection speed cap in Mbps (Hedioum default 8; 100 gave ~5x speed in tests,
+#                       but a higher cap makes traffic look less like an ordinary session)
+#   --min N / --max N   warm / maximum number of pipes to the foreign node
 #   --random-port       pick a random free port (20000-60000) for the VLESS entry
 #   --jitter-restart    install a randomized-restart timer (anti-fingerprinting)
 #   -y, --yes           never prompt; use flags/defaults only
@@ -26,7 +29,7 @@ set -euo pipefail
 
 BUNDLE="/root/iran-bundle"; TOKEN=""; ALIAS="KHAREJ"
 SOCKS_PORT=40001; VLESS_PORT=2100; WS_PATH="/hed-ssh"; UUID=""
-JITTER=0; JITTER_SET=0; YES=0; RANDOM_PORT=0
+JITTER=0; JITTER_SET=0; YES=0; RANDOM_PORT=0; BW=""; MINC=""; MAXC=""
 
 log()  { printf '\033[1;32m[+]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*" >&2; }
@@ -41,6 +44,9 @@ while [ $# -gt 0 ]; do
     --vless-port)     VLESS_PORT="${2:?}"; shift 2;;
     --ws-path)        WS_PATH="${2:?}"; shift 2;;
     --uuid)           UUID="${2:?}"; shift 2;;
+    --bw)             BW="${2:?}"; shift 2;;
+    --min)            MINC="${2:?}"; shift 2;;
+    --max)            MAXC="${2:?}"; shift 2;;
     --random-port)    RANDOM_PORT=1; shift;;
     -y|--yes)         YES=1; shift;;
     --jitter-restart) JITTER=1; JITTER_SET=1; shift;;
@@ -95,6 +101,8 @@ if [ ! -x /usr/local/bin/hedioum-tunnel ]; then
 fi
 log "Pairing with the foreign node (alias $ALIAS)"
 /usr/local/bin/hedioum-tunnel setup-iran --alias "$ALIAS" --token "$TOKEN" --socks-port "$SOCKS_PORT"
+TUNE=(); [ -n "$BW" ] && TUNE+=(--bw "$BW" --jitter 0); [ -n "$MINC" ] && TUNE+=(--min "$MINC"); [ -n "$MAXC" ] && TUNE+=(--max "$MAXC")
+if [ ${#TUNE[@]} -gt 0 ]; then log "Tuning the node: ${TUNE[*]}"; /usr/local/bin/hedioum-tunnel edit-node --alias "$ALIAS" "${TUNE[@]}"; fi
 systemctl enable --now hedioum.service
 systemctl restart hedioum.service
 

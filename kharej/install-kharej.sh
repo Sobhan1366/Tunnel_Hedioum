@@ -8,7 +8,9 @@
 #   sudo bash install-kharej.sh [options]
 #
 # Options:
-#   --persona NAME        auto|cpanel|directadmin|devops   (default: auto)
+#   --mimics LIST         camouflage endpoints, comma list (default: smtp — the only one that carried
+#                         data reliably in testing; TLS-based mimics often stall behind DPI)
+#   --persona NAME        use a Hedioum persona INSTEAD of --mimics (auto|cpanel|directadmin|devops)
 #   --domain DOMAIN       real domain for a Let's Encrypt cert (default: self-signed)
 #   --move-ssh            let Hedioum relocate OpenSSH to its decoy port (default: off)
 #   --jitter-restart      install a randomized-restart timer (anti-fingerprinting)
@@ -27,7 +29,7 @@
 #   -h, --help
 set -euo pipefail
 
-PERSONA="auto"; DOMAIN=""; MOVE_SSH=0; JITTER=0; BUNDLE="/root/iran-bundle"
+PERSONA=""; MIMICS="smtp"; DOMAIN=""; MOVE_SSH=0; JITTER=0; BUNDLE="/root/iran-bundle"
 LISTEN_PORT=""; DECOY_PORT=""; TLS_PORT=""; SMTP_PORT=""; IMAP_PORT=""; SMTPS_PORT=""
 EXTRA=""; YES=0; JITTER_SET=0
 
@@ -40,7 +42,8 @@ die()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --persona)        PERSONA="${2:?}"; shift 2;;
+    --persona)        PERSONA="${2:?}"; MIMICS=""; shift 2;;
+    --mimics)         MIMICS="${2:?}"; PERSONA=""; shift 2;;
     --domain)         DOMAIN="${2:?}"; shift 2;;
     --move-ssh)       MOVE_SSH=1; shift;;
     --jitter-restart) JITTER=1; JITTER_SET=1; shift;;
@@ -68,7 +71,7 @@ yesno() { local ans; read -r -p "$1 [y/N]: " ans || true; [[ "$ans" =~ ^[Yy] ]];
 
 if [ "$YES" -eq 0 ] && [ -t 0 ]; then
   echo "Interactive setup — press Enter to keep the value in [brackets]."
-  ask PERSONA "Persona (auto|cpanel|directadmin|devops)"
+  ask MIMICS  "Camouflage endpoints (comma list; smtp is the proven one)"
   ask DOMAIN  "Domain for Let's Encrypt (blank = self-signed)"
   if yesno "Customize the public mimic ports?"; then
     echo "(blank = Hedioum default)"
@@ -120,7 +123,8 @@ else
 fi
 cp -f /usr/local/bin/hedioum-tunnel "$BUNDLE/hedioum-tunnel"
 
-SETUP_ARGS=(--persona "$PERSONA" --public-ip "$PUBLIC_IP")
+SETUP_ARGS=(--public-ip "$PUBLIC_IP")
+if [ -n "$MIMICS" ]; then SETUP_ARGS+=(--mimics "$MIMICS"); else SETUP_ARGS+=(--persona "${PERSONA:-auto}"); fi
 [ -n "$DOMAIN" ]  && SETUP_ARGS+=(--domain "$DOMAIN")
 [ "$MOVE_SSH" -eq 1 ] && SETUP_ARGS+=(--move-ssh)
 [ -n "$LISTEN_PORT" ] && SETUP_ARGS+=(--listen-port "$LISTEN_PORT")
