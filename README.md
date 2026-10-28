@@ -17,7 +17,11 @@ client --VLESS--> Iran hub (Xray / 3x-ui) --SOCKS5--> Hedioum hub
 | `iran/install-iran.sh` | Iran hub | pairs with the foreign node and exposes a VLESS+WS entry point |
 | `panel/install-panel.sh` | Iran hub | installs the 3x-ui panel (online or **offline tarball**), wires it to Hedioum, creates a Reality inbound |
 | `panel/add-user.sh` · `list-users.sh` · `show-link.sh` · `remove-user.sh` | Iran hub | create users (data limit, expiry, monthly auto-renew), list usage, print links, delete |
+| `dashboard/install-dashboard.sh` | Iran hub | installs the **monitor** + the **web dashboard** (login page, charts, outages, volume, users) in one command |
+| `tools/hedioum-monitor.sh` · `tools/reality-target-check.py` | Iran hub | the monitor the dashboard reads: one summary line a minute, incl. a check that the hub can reach every Reality target |
+| `tools/enable-tls.sh` | Iran hub | adds real TLS (wss) next to the plain WebSocket link, with a Let's Encrypt certificate, without breaking existing links |
 | `docs/GUIDE-FA.md` · `docs/GUIDE-EN.md` | — | very simple step-by-step guides for beginners |
+| `docs/TLS.md` | — | TLS for the WebSocket link: how, why a *new* port, pitfalls |
 | `docs/LESSONS.md` | — | everything we learned the hard way (read it) |
 
 ## 1. Pick the server first — `tools/check-foreign.sh`
@@ -114,11 +118,44 @@ censor sees on the wire (destination IP, protocol, ports). More effective: keep 
 clean (nothing public except SSH), per-user UUIDs, don't push huge volumes through one IP, keep a
 spare foreign server, and rotate servers if one gets throttled.
 
-## 6. Status
+## 6. Dashboard and monitoring
+
+`dashboard/install-dashboard.sh` installs two things on the hub: a **monitor** (a systemd service that writes one
+summary line per minute: service states, the exit IP seen *through* the tunnel, pool size, connections, dial
+problems, and whether the hub can reach each Reality target) and a small **web dashboard** that draws it
+(date filter, outages, daily table, traffic volume) and, if the 3x-ui panel is wired, manages users (add with
+GB/day limits, links, remove). Python standard library only; login page with PBKDF2 hashes, lockout per IP,
+HttpOnly cookies, CSRF header.
+
+```bash
+sudo bash dashboard/install-dashboard.sh                                          # local only; reach it with an SSH tunnel
+sudo bash dashboard/install-dashboard.sh --public --self-signed hub.example.com   # or --cert/--key (see §7)
+```
+
+It refuses `--public` without HTTPS and prints the generated password once. Details: [dashboard/README.md](dashboard/README.md).
+The monitor matters beyond the charts: during a real incident the tunnel services were all "active" while every
+client of one inbound timed out, and only the Reality-target check showed why (see `docs/LESSONS.md`).
+
+## 7. TLS for the WebSocket link
+
+The link `install-iran.sh` prints is plain WebSocket (`security=none`). Reality links need no certificate (Reality
+is itself a TLS 1.3 handshake). To add real TLS you need a DNS name pointing at the hub ("DNS only", not behind a
+CDN proxy) and port 80 reachable once:
+
+```bash
+bash tools/enable-tls.sh --domain hub.example.com --dry-run     # plan + config test, changes nothing
+bash tools/enable-tls.sh --domain hub.example.com               # certificate, TLS copy on 443 (and 8443), new links
+```
+
+It is **additive**: each plain WebSocket inbound is cloned onto a TLS port with the same users, the plain port
+keeps working, and a failed check rolls the config back. A port is either plain or TLS, so a `security=tls`
+link must use the TLS port. See [docs/TLS.md](docs/TLS.md).
+
+## 8. Status
 
 The scripts come from a manually built and repeatedly tested setup. `install-kharej.sh` was run
 end-to-end on several fresh servers and `install-iran.sh` on a hub, with fixes along the way;
-`check-foreign.sh` is validated only on the "good" side (see §1). The panel scripts were tested end-to-end on a clean server (offline install, one-command fresh install, users with and without limits, each user connecting with its own link, removal) in `--direct` test mode; through a real Hedioum hub they were verified by hand. Test on a throw-away pair first.
+`check-foreign.sh` is validated only on the "good" side (see §1). The panel scripts were tested end-to-end on a clean server (offline install, one-command fresh install, users with and without limits, each user connecting with its own link, removal) in `--direct` test mode; through a real Hedioum hub they were verified by hand. The dashboard installer and `enable-tls.sh` were tested in a loopback sandbox (including failure cases) and then on a live hub. Test on a throw-away pair first.
 
 ---
 
@@ -130,6 +167,8 @@ end-to-end on several fresh servers and `install-iran.sh` on a hub, with fixes a
 * سرعت هر اتصال هدیوم به‌صورت پیش‌فرض ۸Mbps است؛ با `--bw 100` حدود ۵ برابر می‌شود (به قیمت عادی‌نبودن بیشتر ترافیک).
 * نود دوم به همان سرور ظرفیت کل را زیاد نمی‌کند؛ گلوگاه هاب/مسیر است.
 * حجم ماهانه‌ی کاربر فقط روی اینباندهای پنل 3x-ui کار می‌کند؛ مسیریابی هر اینباند را به خروجی هدیوم فراموش نکنید.
+* داشبورد وب + مانیتورینگ: `sudo bash dashboard/install-dashboard.sh` (صفحه‌ی ورود با رمز، نمودار قطعی‌ها، حجم، مدیریت کاربر). مانیتور هر دقیقه یک خط ثبت می‌کند و چک می‌کند هاب به مقصد Reality می‌رسد یا نه.
+* TLS برای لینک وب‌سوکت: `bash tools/enable-tls.sh --domain hub.example.com` (دامنه باید «DNS only» باشد، نه پشت CDN). پورت جدید TLS اضافه می‌شود و لینک‌های قبلی خراب نمی‌شوند؛ جزئیات در `docs/TLS.md`.
 * جزئیات و اشتباهات رایج: `docs/LESSONS.md`.
 
 ## License

@@ -71,3 +71,58 @@ time, then both together.
 * The offline release archive unpacks to a top-level `x-ui/` folder; the systemd unit and `x-ui.sh` ship inside it
   (`x-ui.service.debian` on Ubuntu). `x-ui setting -username … -password … -port … -webBasePath …` creates the database and the login.
 * Editing the panel database while the panel runs races with it: backup (SQLite backup API), stop, edit, start, then check the running config.
+
+## A hub-wide international cut (not the tunnel's fault)
+Symptom: every user dies at once, the hub's own `ping 1.1.1.1` / `8.8.8.8` fails, and `tcpdump` shows outbound SYNs to
+foreign addresses with no SYN-ACK. All services still say `active`. Reachability *from abroad* to the hub's ports is
+dropped too (check it from several countries with check-host.net, not only from your own PC). That is the hub's IP or
+its upstream being restricted, **not** DPI of the tunnel protocol (a plain ping would not be affected). What worked:
+the provider changed the hub's IP; nothing on the servers needed repairing. Do not conclude "we were detected because
+we raised the speed" from timing alone - rule the cut out first.
+* **Put a DNS name, not an IP, in client links** ("DNS only", not CDN-proxied). Then a new IP is a DNS edit, not a new
+  link for every user. Keep the hub's host name in one place (`/etc/tunnel-panel.json`).
+* After an IP change re-check everything that embeds the old address: panel link host, dashboard certificate
+  (`subjectAltName`), any client or router that dials the hub by IP.
+* A VPN/proxy on the admin's own PC can make a *domestic* dashboard unreachable (the traffic leaves via a foreign
+  exit and the Iranian host drops it). If the page "just won't open", turn that off first.
+
+## Reality inbound: the target must be reachable FROM THE HUB
+For every new client handshake xray connects to the Reality `target` site and relays the TLS exchange. If the hub
+cannot reach that site, every client of the inbound times out - while the tunnel, xray and the panel all look healthy.
+* Signature: the client's ClientHello arrives, the server sends **nothing** (for minutes); `ss -tnp` shows many
+  xray sockets in **SYN-SENT** to the target; `ss -ti` on the client connections shows received bytes but none sent.
+* It was one *address* of a big site that was dropped from the hub (SYN, no answer) while other addresses of the same
+  site, other sites and other networks reached it fine. Test per address with `curl --resolve` or `/dev/tcp/IP/443`.
+* **Fix that keeps every client link valid:** keep the SNI/`serverNames`, change only the `target` to another
+  address of the same site that serves the same real certificate (`target: "IP:443"`, same `serverNames`). Switching
+  to a *different* site changes what the server shows for the old SNI, and old links failed on most sites we tried.
+* Validate in a throw-away xray server/client pair on loopback ports before touching the live inbound; use a
+  public address as the probe destination (recent xray refuses `freedom` to loopback/private targets:
+  "blocked target").
+* Recent xray warns that Reality has a default **minimum client version** and flags some popular domains as risky
+  targets; a client with an old core may be refused. When *one* user times out and others do not, rule the target
+  out first, then ask for the client app and version.
+* `tools/reality-target-check.py` (run by the monitor) turns this into a visible, per-minute signal.
+
+## Dashboard / monitor notes
+* Wrap the TLS socket **without** handshaking in the accept loop and do the handshake in the worker thread with a
+  timeout; otherwise one idle or plain-HTTP client blocks every other connection.
+* Lock out per client IP, not globally, or an attacker (or you, after a typo storm) locks the owner out.
+* `panel_tool.py add-user --gb N --days D` used to switch monthly auto-renew on by itself; pass `--renew 0` when the
+  user should simply expire.
+* Open the panel database read-only (`file:...?mode=ro`) for statistics; only `panel_tool.py` writes, and it stops the
+  panel around the edit.
+* The monitor must record the exit IP seen *through* the tunnel; "service active" is not "tunnel works". Parsing is
+  tolerant of missing fields, so older log lines and new fields can coexist.
+* `vnstat` gives volume that survives reboots; NIC counters reset at boot.
+
+## TLS for the WebSocket link - see [TLS.md](TLS.md)
+Highlights: a `security=tls` link on a plain port looks like "connects but no ping"; a CDN-proxied name breaks
+non-web ports; `xray -test` does not read certificates; xray decides the config format from the file extension;
+WebSocket is deprecated in recent xray (plan XHTTP); add a TLS copy on a new port instead of converting the old one.
+
+## Testing habit that paid off
+Build the sandbox first: copy the config, move every listener to loopback/test ports, run the real binaries, run
+the **negative** cases too (wrong UUID, broken certificate, missing files) and check the live service is untouched.
+This found three real bugs (a temp file without `.json`, an unchecked certificate, an installer that would have
+`chmod`ed shared directories) before any of it reached a production host.

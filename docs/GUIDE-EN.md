@@ -122,6 +122,16 @@ A single download gets ~5× faster, traffic looks less ordinary, and the *total*
 ## 8. Randomized restarts (optional)
 Answer `y` to "Install the randomized-restart timer?" on both servers. It breaks the pattern of a never-ending connection; it does **not** hide what a censor can see on the wire.
 
+## 8a. TLS for the plain WebSocket link (optional)
+The link printed in step 5 uses plain WebSocket (`security=none`). To add real TLS you need a **domain name** pointing at the hub (DNS only, not behind a CDN proxy) and port 80 reachable. On the hub:
+```
+bash enable-tls.sh --domain hub.example.com --dry-run
+```
+```
+bash enable-tls.sh --domain hub.example.com
+```
+It gets a certificate, adds a TLS copy of the link on port **443** (and 8443 for a second route) and prints the new links. The old plain port keeps working, so nobody's link breaks. A link with `security=tls` must use the **TLS port**, never the old plain one. Details and pitfalls: [TLS.md](TLS.md). Reality links (panel users) need none of this.
+
 ## 9. Troubleshooting
 | Problem | Fix |
 |---|---|
