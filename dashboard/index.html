@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="fa" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>داشبورد تانل</title>
+<style>
+/* ---- tokens: روشن = ظاهر طرح ۱۳، تاریک = ظاهر طرح ۱۴ (هر دو با سایدبار راست) ---- */
+:root{
+  --bg:#F3F5F9; --panel:#FFFFFF; --text:#18202E; --muted:#566277; --line:#E1E6EE; --nav:#FFFFFF;
+  --acc:#6B4EFF; --acc-ink:#FFFFFF; --acc-soft:rgba(107,78,255,.12);
+  --ok:#14804A; --bad:#C0392B; --warn:#9A6A12; --shade:rgba(192,57,43,.12);
+  --radius:12px; --pad:14px; --gap:12px; --cb:1px solid var(--line); --kpi-cols:4; --shadow:none;
+}
+html[data-theme="dark"]{
+  --bg:#13101F; --panel:#1B1730; --text:#EFEBFA; --muted:#A9A0C6; --line:#2D2748; --nav:#100D1B;
+  --acc:#B79CFF; --acc-ink:#1A1030; --acc-soft:rgba(183,156,255,.16);
+  --ok:#5BD38F; --bad:#EF7A6B; --warn:#E0B04A; --shade:rgba(239,122,107,.2);
+  --radius:10px; --pad:11px; --gap:10px; --cb:1px solid transparent; --kpi-cols:3;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:Vazirmatn,Tahoma,"Segoe UI",system-ui,sans-serif;font-size:14.5px;line-height:1.7}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+.app{display:flex;min-height:100vh}
+/* سایدبار: اولین فرزند در RTL = سمت راست */
+.side{width:204px;flex:none;background:var(--nav);border-left:var(--cb);border-left-color:var(--line);display:flex;flex-direction:column;padding:14px 10px;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 8px 14px;font-weight:700;font-size:16px}
+.mark{width:20px;height:20px;border-radius:6px;background:var(--acc);display:inline-block}
+.grp{font-size:11.5px;color:var(--muted);padding:12px 10px 4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;color:var(--muted);font-weight:500;min-height:40px}
+.nav a:hover{background:var(--acc-soft)}
+.nav a.on{background:var(--acc-soft);color:var(--acc);font-weight:700}
+.nav svg{flex:none}
+.side-foot{margin-top:auto;padding:12px 8px 2px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--muted)}
+.main{flex:1;min-width:0;padding:18px 20px 40px;display:flex;flex-direction:column;gap:var(--gap)}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:12.5px}
+.actions{display:flex;gap:8px;align-items:center}
+
+.card{background:var(--panel);border:var(--cb);border-radius:var(--radius);padding:var(--pad);min-width:0;box-shadow:var(--shadow)}
+html:not([data-theme="dark"]) .card{border-color:var(--line)}
+h2{font-size:14.5px;margin:0 0 8px}
+h3{font-size:13.5px;margin:0 0 6px}
+.note{color:var(--muted);font-size:12.5px;margin-top:6px}
+.num{direction:ltr;text-align:left;unicode-bidi:plaintext}
+
+/* دکمه‌ها */
+button{border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:var(--acc);color:var(--acc-ink);min-height:38px}
+button.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.ghost:hover{background:var(--acc-soft)}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+button.icon{padding:6px 9px}
+button:disabled{opacity:.55;cursor:default}
+button.chip{border-radius:999px;padding:5px 12px;min-height:34px;background:transparent;color:var(--text);border:1px solid var(--line)}
+button.chip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+input[type=text],input[type=number],input[type=date],input[type=password]{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%;min-height:38px}
+label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:3px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* فیلتر تاریخ */
+.filter{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.filter .f{width:150px}
+.filter .presets{display:flex;gap:6px;flex-wrap:wrap}
+
+/* شاخص‌ها */
+.kpis{display:grid;grid-template-columns:repeat(var(--kpi-cols),minmax(0,1fr));gap:var(--gap)}
+.kpi .label{color:var(--muted);font-size:12.5px}
+.kpi .val{font-size:22px;font-weight:700;direction:ltr;text-align:right;margin:2px 0;white-space:nowrap}
+.kpi .hint{color:var(--muted);font-size:12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);margin-inline-end:6px}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+.good{color:var(--ok)} .badc{color:var(--bad)}
+
+/* چیدمان نمای کلی */
+.ov{display:grid;gap:var(--gap)}
+html:not([data-theme="dark"]) .ov{grid-template-columns:1fr 1fr;grid-template-areas:"kp kp" "ch ch" "us sv"}
+html[data-theme="dark"] .ov{grid-template-columns:1.6fr 1fr;grid-template-areas:"kp kp" "ch us" "sv sv"}
+.ov .kp{grid-area:kp} .ov .ch{grid-area:ch} .ov .us{grid-area:us} .ov .sv{grid-area:sv}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:13px;display:inline-flex;align-items:center}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:5px}
+.gauge{height:8px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:6px}
+.gauge>i{display:block;height:100%;background:var(--acc)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12.5px}
+.scroll{overflow-x:auto}
+.bar{height:7px;background:var(--line);border-radius:5px;overflow:hidden;min-width:90px;margin-top:4px}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.bar.hot>i{background:var(--warn)} .bar.full>i{background:var(--bad)}
+.tag{font-size:12px;border-radius:6px;padding:1px 8px;border:1px solid var(--line);color:var(--muted)}
+.tag.on{color:var(--ok);border-color:var(--ok)} .tag.off{color:var(--bad);border-color:var(--bad)}
+
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--gap);align-items:end}
+.msg{margin-top:12px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);word-break:break-all}
+.msg.err{border-color:var(--bad);color:var(--bad)} .msg.okk{border-color:var(--ok)}
+.link{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:12.5px;background:var(--bg);padding:8px;border-radius:8px;margin:8px 0;user-select:all}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+
+.empty{color:var(--muted);padding:6px 2px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--gap)}
+
+@media (max-width:820px){
+  .app{flex-direction:column}
+  .side{width:auto;height:auto;position:static;flex-direction:row;overflow-x:auto;border-left:0;border-bottom:1px solid var(--line);padding:8px;gap:4px;align-items:center}
+  .brand{padding:4px 8px}
+  .grp{display:none}
+  .nav{display:flex;gap:2px}
+  .nav a{white-space:nowrap;min-height:40px}
+  .side-foot{display:none}
+  .main{padding:14px 12px 32px}
+  :root,html[data-theme="dark"]{--kpi-cols:2}
+  .ov{grid-template-columns:1fr !important;grid-template-areas:"kp" "ch" "us" "sv" !important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><span class="mark"></span><span>داشبورد تانل</span></div>
+    <nav class="nav" id="nav" aria-label="بخش‌ها"></nav>
+    <div class="side-foot">
+      <span id="who"></span>
+      <button class="ghost" id="logout">خروج</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <div>
+        <h1 id="pageTitle">نمای کلی</h1>
+        <div class="sub" id="stamp">در حال بارگذاری…</div>
+      </div>
+      <div class="actions">
+        <button class="ghost icon" id="themeBtn" aria-label="تغییر تم روشن / تاریک" title="تغییر تم"></button>
+        <button class="ghost" id="refresh">به‌روزرسانی</button>
+      </div>
+    </header>
+
+    <section class="card filter" id="filterBar" aria-label="فیلتر تاریخ">
+      <div class="f"><label for="d_from">از تاریخ</label><input type="date" id="d_from"></div>
+      <div class="f"><label for="d_to">تا تاریخ</label><input type="date" id="d_to"></div>
+      <div><button id="d_apply">اعمال فیلتر</button></div>
+      <div class="presets" id="presets">
+        <button class="chip" data-range="4">۴ روز</button>
+        <button class="chip" data-range="14">۱۴ روز</button>
+        <button class="chip" data-range="30">۳۰ روز</button>
+        <button class="chip" data-range="0">همه</button>
+      </div>
+      <div class="note" id="rangeNote" style="flex-basis:100%;margin:0"></div>
+    </section>
+
+    <div id="view"></div>
+  </main>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtT = t => String(t).replace("T"," ").slice(5,16);
+const POST = b => ({method:"POST", headers:{"Content-Type":"application/json","X-Dash":"1"}, body:JSON.stringify(b||{})});
+
+/* ---------------------------------------------------------------- تب‌ها */
+const ICON = {
+  overview:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  connections:'M3 12h4l3-8 4 16 3-8h4',
+  dial:'M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4',
+  outages:'M12 3l10 18H2zM12 10v5M12 18h.01',
+  volume:'M5 20V10M12 20V4M19 20v-7',
+  users:'M16 20v-1a4 4 0 00-4-4H8a4 4 0 00-4 4v1M10 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM20 20v-1a4 4 0 00-3-3.9',
+  add:'M12 5v14M5 12h14',
+  settings:'M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6'
+};
+const TABS = [
+  {id:"overview",    label:"نمای کلی",       group:"پایش",     filter:true},
+  {id:"connections", label:"اتصال‌ها",        group:"پایش",     filter:true},
+  {id:"dial",        label:"تلاش‌های اتصال",  group:"پایش",     filter:true},
+  {id:"outages",     label:"قطعی‌ها",         group:"پایش",     filter:true},
+  {id:"volume",      label:"حجم ترافیک",      group:"پایش"},
+  {id:"users",       label:"کاربران",         group:"کاربران"},
+  {id:"add",         label:"افزودن کاربر",    group:"کاربران"},
+  {id:"settings",    label:"تنظیمات",         group:"سیستم"}
+];
+const svgIcon = (p, size=18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p}"></path></svg>`;
+
+let TAB = "overview";
+let DATA = null;
+
+function buildNav(){
+  let html = "", last = "";
+  for(const t of TABS){
+    if(t.group !== last){ html += `<div class="grp">${t.group}</div>`; last = t.group; }
+    html += `<a href="#${t.id}" data-tab="${t.id}">${svgIcon(ICON[t.id])}<span>${t.label}</span></a>`;
+  }
+  $("#nav").innerHTML = html;
+}
+function markNav(){
+  document.querySelectorAll("#nav a").forEach(a => {
+    const on = a.dataset.tab === TAB;
+    a.classList.toggle("on", on);
+    if(on) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current");
+  });
+  const t = TABS.find(x => x.id === TAB);
+  $("#pageTitle").textContent = t ? t.label : "";
+  $("#filterBar").style.display = t && t.filter ? "flex" : "none";
+}
+
+/* ---------------------------------------------------------------- تم */
+const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : {matches:false};
+function themePref(){ try{ return localStorage.getItem("dash_theme") || "auto"; }catch(e){ return "auto"; } }
+function effTheme(){ const p = themePref(); return p === "auto" ? (mq.matches ? "dark" : "light") : p; }
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", effTheme());
+  $("#themeBtn").innerHTML = effTheme() === "dark"
+    ? svgIcon("M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z")
+    : svgIcon("M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z");
+}
+function setTheme(p){ try{ localStorage.setItem("dash_theme", p); }catch(e){} applyTheme(); if(DATA) render(); }
+if(mq.addEventListener) mq.addEventListener("change", () => { if(themePref()==="auto"){ applyTheme(); if(DATA) render(); } });
+
+/* ---------------------------------------------------------------- فیلتر تاریخ */
+const todayStr = () => new Date().toISOString().slice(0,10);
+const addDays = (s, n) => { const d = new Date(s+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+let RANGE = {days:4};
+try{ const r = JSON.parse(localStorage.getItem("dash_range")||"null"); if(r && (r.days!==undefined || (r.from&&r.to))) RANGE = r; }catch(e){}
+function setRange(r){ RANGE = r; try{ localStorage.setItem("dash_range", JSON.stringify(r)); }catch(e){} load(); }
+function rangeQuery(){
+  const to = todayStr();
+  if(RANGE.days === 0) return "from=2000-01-01&to=" + to;   // the server clamps to the first sample
+  if(RANGE.days) return "from=" + addDays(to, -(RANGE.days-1)) + "&to=" + to;
+  return "from=" + RANGE.from + "&to=" + RANGE.to;
+}
+
+/* ---------------------------------------------------------------- API */
+async function api(path, opt){
+  const r = await fetch(path, opt);
+  if(r.status === 401 && !path.startsWith("/api/login")){ location.href = "/login"; throw new Error("نشست منقضی شد"); }
+  const j = await r.json().catch(()=>({error:"پاسخ نامعتبر"}));
+  if(!r.ok) throw new Error(j.error || ("HTTP "+r.status));
+  return j;
+}
+
+/* ---------------------------------------------------------------- نمودارها */
+function chartLines(pts, style){
+  if(!pts.length) return '<div class="empty">داده‌ای در این بازه نیست.</div>';
+  const W=1000,H=230,L=42,R=10,T=10,B=26;
+  const maxV = Math.max(10, ...pts.map(p=>p.max));
+  const x = i => L + (W-L-R) * (pts.length===1?0.5:i/(pts.length-1));
+  const y = v => T + (H-T-B) * (1 - v/maxV);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="نمودار اتصال‌های هم‌زمان">`;
+  for(let k=0;k<=4;k++){ const v=maxV*k/4, yy=y(v); s+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${Math.round(v)}</text>`; }
+  const sw = Math.max(3, (W-L-R)/pts.length);
+  pts.forEach((p,i)=>{ if(p.down_frac>=0.3) s+=`<rect x="${x(i)-sw/2}" y="${T}" width="${sw}" height="${H-T-B}" fill="var(--shade)"/>`; });
+  const path = k => pts.map((p,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(p[k]).toFixed(1)).join(" ");
+  if(style === "area") s += `<path d="${path('avg')} L${x(pts.length-1).toFixed(1)} ${H-B} L${x(0).toFixed(1)} ${H-B} Z" fill="var(--acc-soft)"/>`;
+  s += `<path d="${path('max')}" fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  s += `<path d="${path('avg')}" fill="none" stroke="var(--acc)" stroke-width="2.4" stroke-linejoin="round"/>`;
+  const step = Math.max(1, Math.round(pts.length/8));
+  pts.forEach((p,i)=>{ if(i%step===0) s+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle">${fmtT(p.t)}</text>`; });
+  return s + "</svg>";
+}
+function chartBars(pts){
+  if(!pts.length) return '<div class="empty">داده‌ای در این بازه نیست.</div>';
+  const W=1000,H=220,L=42,R=10,T=10,B=26;
+  const maxV = Math.max(10, ...pts.map(p=>Math.max(p.ok,p.fail)));
+  const bw = (W-L-R)/pts.length;
+  const y = v => T + (H-T-B)*(1-v/maxV);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="نمودار تلاش‌های اتصال">`;
+  for(let k=0;k<=4;k++){ const v=maxV*k/4, yy=y(v); s+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${Math.round(v)}</text>`; }
+  pts.forEach((p,i)=>{
+    const x0=L+i*bw+bw*0.08, w=bw*0.4;
+    s+=`<rect x="${x0}" y="${y(p.ok)}" width="${w}" height="${H-B-y(p.ok)}" fill="var(--ok)"/>`;
+    s+=`<rect x="${x0+w+1}" y="${y(p.fail)}" width="${w}" height="${H-B-y(p.fail)}" fill="var(--bad)"/>`;
+  });
+  const step = Math.max(1, Math.round(pts.length/8));
+  pts.forEach((p,i)=>{ if(i%step===0) s+=`<text x="${L+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${fmtT(p.t)}</text>`; });
+  return s + "</svg>";
+}
+
+/* ---------------------------------------------------------------- اجزای مشترک */
+const dur = m => m>=60 ? (Math.floor(m/60)+" ساعت و "+(m%60)+" دقیقه") : (m+" دقیقه");
+const kpi = (label, val, hint, dot) => `<div class="card kpi"><div class="label">${dot?`<span class="dot ${dot}"></span>`:""}${label}</div><div class="val">${val}</div><div class="hint">${hint||""}</div></div>`;
+const legendConns = '<div class="legend"><span><i style="background:var(--acc)"></i>میانگین</span><span><i style="background:var(--muted)"></i>بیشینه</span><span><i style="background:var(--shade);border:1px solid var(--bad)"></i>مسیر قطع</span></div>';
+const SV_NAMES = {"hedioum":"هدیوم","xray-iran":"xray (۲۱۰۰/۲۱۰۵)","x-ui":"پنل 3x-ui","openvpn-bridge":"بریج OpenVPN","hedioum-monitor":"مانیتور","vnstat":"شمارنده‌ی حجم","tunnel-jitter-restart.timer":"تایمر ری‌استارت"};
+
+function kpisHtml(){
+  const L = DATA.live, ml = L.monitor_last||{}, node = L.node||{}, v = L.volume||{};
+  return kpi("مسیر هاب ← خارج", L.exit_ok?"سالم":"قطع", L.exit_ok?"آی‌پی خروجی پاسخ می‌دهد":"آی‌پی خروجی خالی است", L.exit_ok?"ok":"bad")
+    + kpi("اتصال هم‌زمان کاربران", ml.vless_conns ?? "—", "در آخرین دقیقه‌ی ثبت‌شده")
+    + kpi("Pool (فعال / سقف)", (ml.tcp_active ?? "—") + " / " + (node.max ?? "—"), "حداقل " + (node.min ?? "—"))
+    + kpi("سرعت هر اتصال", (node.bw_mbps ?? "—") + " Mbps", "jitter ± " + (node.jitter_mbps ?? "—"))
+    + kpi("حجم تقریبی بین‌المللی", (v.intl_gb_per_day_est ?? "—") + " GB", "در روز (برآورد، " + (v.hours ?? "—") + " ساعت)")
+    + kpi("ری‌استارت بعدی (UTC)", (DATA.live.next_restart || "—").slice(-5), DATA.live.next_restart || "");
+}
+function servicesHtml(){
+  const L = DATA.live, node = L.node||{}, ml = L.monitor_last||{};
+  const act = Number(ml.tcp_active), mx = Number(node.max) || 20;
+  const pct = isFinite(act) ? Math.min(100, act / mx * 100) : 0;
+  // Reality target reachability (monitor field; absent on older monitors -> pill hidden)
+  const rt = Number(ml.reality_targets), rf = Number(ml.reality_fail), rs = Number(ml.reality_stuck);
+  const haveRt = isFinite(rt) && rt > 0, rtBad = haveRt && (rf > 0 || rs >= 5);
+  const rtPill = haveRt ? `<span class="pill"><span class="dot ${rtBad?'bad':'ok'}"></span>مقصد Reality</span>` : "";
+  const rtNote = rtBad ? `<div class="note" style="color:var(--bad)">هاب به مقصد Reality نمی‌رسد (${esc(ml.reality_bad && ml.reality_bad!=="-" ? ml.reality_bad : "سوکت‌های گیرکرده: "+rs)}) — کاربران اینباندهای Reality تایم‌اوت می‌شوند. مقصد را در پنل 3x-ui عوض کن.</div>` : "";
+  return `<h2>سرویس‌ها</h2><div class="chips">` +
+    Object.entries(L.services).map(([k,s])=>`<span class="pill"><span class="dot ${s==='active'?'ok':'bad'}"></span>${SV_NAMES[k]||k}</span>`).join("") + rtPill +
+    `</div>${rtNote}<div class="note">Pool: ${isFinite(act)?act:"—"} از ${mx}</div><div class="gauge"><i style="width:${pct}%"></i></div>`;
+}
+function usersTable(managedActions){
+  const u = ((DATA.users && DATA.users.users) || []).slice().sort((a,b)=> (b.enabled - a.enabled) || (b.managed - a.managed));
+  if(!u.length) return '<div class="empty">کاربری ثبت نشده.</div>';
+  return `<table><tr><th>نام</th><th>وضعیت</th><th>مصرف / سقف</th><th>انقضا</th><th>تمدید</th><th>آخرین اتصال</th><th>ورودی</th>${managedActions?"<th></th>":""}</tr>` +
+    u.map(r=>{
+      const pct = r.limit_gb ? Math.min(100, r.used_gb/r.limit_gb*100) : 0;
+      const cls = pct>=100?"full":(pct>=80?"hot":"");
+      const lim = r.limit_gb ? `${r.used_gb} / ${r.limit_gb} GB` : `${r.used_gb} GB / نامحدود`;
+      const exp = r.expires ? `${r.expires} (${r.days_left>=0? r.days_left+" روز":"گذشته"})` : "بدون انقضا";
+      const seen = r.last_seen_min==null ? "—" : (r.last_seen_min<2 ? "هم‌اکنون" : r.last_seen_min+" دقیقه پیش");
+      const acts = managedActions ? `<td>${r.managed ? `<button class="ghost" data-link="${esc(r.name)}">لینک</button> <button class="danger" data-rm="${esc(r.name)}">حذف</button>` : ""}</td>` : "";
+      return `<tr style="${r.enabled?'':'opacity:.55'}"><td>${esc(r.name)}</td><td><span class="tag ${r.enabled?'on':'off'}">${r.enabled?'فعال':'غیرفعال'}</span></td>
+        <td><div class="num">${lim}</div>${r.limit_gb?`<div class="bar ${cls}"><i style="width:${pct}%"></i></div>`:""}</td>
+        <td>${exp}</td><td class="num">${r.renew_days? r.renew_days+" روز":"—"}</td><td>${seen}</td><td class="num">:${r.port}</td>${acts}</tr>`;
+    }).join("") + "</table>";
+}
+function usersMini(){
+  const u = ((DATA.users && DATA.users.users) || []).filter(x=>x.enabled).sort((a,b)=>b.used_gb-a.used_gb).slice(0,4);
+  if(!u.length) return '<div class="empty">کاربر فعالی نیست.</div>';
+  return u.map(r=>{
+    const pct = r.limit_gb ? Math.min(100, r.used_gb/r.limit_gb*100) : 0;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px">
+      <span class="num" style="text-align:right">${esc(r.name)}</span><span class="num">${r.used_gb}${r.limit_gb?" / "+r.limit_gb:""} GB</span></div>`;
+  }).join("");
+}
+function dailyTable(h){
+  return `<div class="scroll"><table><tr><th>روز (UTC)</th><th>نمونه‌ی ثبت‌شده</th><th>میانگین اتصال</th><th>بیشینه</th><th>رویداد pool</th><th>قطع (٪ نمونه‌ها)</th></tr>` +
+    (h.daily||[]).map(r=>`<tr><td class="num">${r.t}</td><td class="num">${r.samples}</td><td class="num">${r.avg}</td><td class="num">${r.max}</td><td class="num">${r.distress}</td><td class="num">${Math.round((r.down_frac||0)*100)}%</td></tr>`).join("") + "</table></div>" +
+    (h.ip_era && h.first && h.ip_era > h.first
+      ? `<div class="note">قبل از ${esc(h.ip_era)} مانیتور نمونه‌ها را کم‌تر ثبت می‌کرد و آی‌پی خروجی را ثبت نمی‌کرد؛ «قطع» در آن دوره فقط از وضعیت سرویس‌ها استنباط می‌شود.</div>` : "");
+}
+
+/* ---------------------------------------------------------------- صفحه‌ها */
+const VIEWS = {
+  overview(h){
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    return `<div class="ov">
+      <div class="kp kpis">${kpisHtml()}</div>
+      <div class="card ch"><h2>اتصال‌های هم‌زمان</h2>${chartLines(h.series||[], dark?"area":"line")}${legendConns}</div>
+      <div class="card us"><h2>کاربران پرمصرف</h2>${usersMini()}<div class="note"><a href="#users" style="color:var(--acc)">همه‌ی کاربران ←</a></div></div>
+      <div class="card sv">${servicesHtml()}</div>
+    </div>`;
+  },
+  connections(h){
+    return `<div class="card"><h2>اتصال‌های هم‌زمان</h2>${chartLines(h.series||[], "area")}${legendConns}</div>
+      <div class="card scroll"><h2>روزانه</h2>${dailyTable(h)}</div>`;
+  },
+  dial(h){
+    return `<div class="card"><h2>تلاش‌های اتصال هاب به سرور خارج</h2>${chartBars(h.dial||[])}
+      <div class="legend"><span><i style="background:var(--ok)"></i>موفق</span><span><i style="background:var(--bad)"></i>timeout</span></div>
+      <div class="note">اگر ستون قرمز بالا بیاید یعنی هاب نمی‌تواند اتصال جدید به سرور خارج بسازد (بسته‌ها بی‌پاسخ می‌مانند). این نمودار فقط از ${esc(h.dial_from||"—")} به بعد کامل است.</div></div>`;
+  },
+  outages(h){
+    const o = (h.outages&&h.outages.length)
+      ? `<div class="scroll"><table><tr><th>شروع (UTC)</th><th>پایان (UTC)</th><th>مدت</th></tr>` + h.outages.map(x=>`<tr><td class="num">${x.start}</td><td class="num">${x.end}</td><td>${dur(x.minutes)}</td></tr>`).join("") + "</table></div>"
+      : '<div class="empty">در این بازه قطعی طولانی ثبت نشده.</div>';
+    const g = (h.gaps&&h.gaps.length)
+      ? `<div class="scroll"><table><tr><th>از (UTC)</th><th>تا (UTC)</th><th>مدت</th></tr>` + h.gaps.map(x=>`<tr><td class="num">${x.from}</td><td class="num">${x.to}</td><td>${dur(x.minutes)}</td></tr>`).join("") + "</table></div>" +
+        '<div class="note">در این بازه‌ها مانیتور هیچ نمونه‌ای ثبت نکرده (سرور یا مانیتور خاموش/ری‌استارت بوده).</div>'
+      : '<div class="empty">در این بازه فاصله‌ی بدون داده‌ی بیش از ۲۰ دقیقه نیست.</div>';
+    return `<div class="two"><div class="card"><h2>قطعی‌ها</h2>${o}</div><div class="card"><h2>بازه‌های بدون داده</h2>${g}</div></div>`;
+  },
+  volume(){
+    const v = DATA.live.volume || {}, L = DATA.live;
+    const days = (v.vnstat_days||[]);
+    return `<div class="kpis">` +
+      kpi("دریافتی کارت شبکه", (v.rx_gb ?? "—") + " GB", "از آخرین بوت: " + (L.boot_since_utc||"—")) +
+      kpi("ارسالی کارت شبکه", (v.tx_gb ?? "—") + " GB", "هر بایت دو بار شمرده می‌شود") +
+      kpi("جمع کارت شبکه در روز", (v.nic_gb_per_day ?? "—") + " GB", "برآورد") +
+      kpi("حجم بین‌المللی در روز", (v.intl_gb_per_day_est ?? "—") + " GB", "برآورد (نصف جمع)") + `</div>
+      <div class="card scroll"><h2>مصرف روزانه (vnstat)</h2>` + (days.length
+        ? `<table><tr><th>روز</th><th>دریافت</th><th>ارسال</th></tr>` + days.map(r=>`<tr><td class="num">${r.date}</td><td class="num">${r.rx_gb} GB</td><td class="num">${r.tx_gb} GB</td></tr>`).join("") + "</table>"
+        : '<div class="empty">شمارنده‌ی روزانه تازه نصب شده؛ بعد از چند ساعت اینجا جدول روزانه پیدا می‌شود.</div>') + `</div>`;
+  },
+  users(){
+    return `<div class="card scroll"><h2>کاربران</h2>${usersTable(true)}<div id="userMsg"></div>
+      <div class="note">لینک و حذف فقط برای کاربران ورودی مدیریت‌شده (${esc((DATA.users&&DATA.users.port)||"")}) فعال است. با ساخت یا حذف کاربر پنل 3x-ui چند ثانیه ری‌استارت می‌شود.</div></div>`;
+  },
+  add(){
+    return `<div class="card"><h2>افزودن کاربر جدید</h2>
+      <div class="form">
+        <div><label for="f_name">نام (انگلیسی، بدون فاصله)</label><input type="text" id="f_name" placeholder="مثلاً ali-phone" autocomplete="off"></div>
+        <div><label for="f_gb">حجم (گیگابایت، ۰ = نامحدود)</label><input type="number" id="f_gb" value="30" min="0" step="1"></div>
+        <div><label for="f_days">مدت (روز، ۰ = بدون انقضا)</label><input type="number" id="f_days" value="30" min="0" step="1"></div>
+        <div><label for="f_dev">حداکثر دستگاه (۰ = بدون محدودیت)</label><input type="number" id="f_dev" value="0" min="0" step="1"></div>
+        <div><label><input type="checkbox" id="f_monthly"> ماهانه با تمدید خودکار (هر ۳۰ روز حجم صفر و مدت تمدید می‌شود)</label></div>
+        <div><button id="add">ساخت کانفیگ</button></div>
+      </div>
+      <div id="addMsg"></div>
+      <div class="note">«حجم + مدت» بدون تمدید است و بعد از انقضا قطع می‌شود. با ساخت کاربر پنل ۳x-ui حدود ۱۰ تا ۲۵ ثانیه ری‌استارت می‌شود؛ کاربران پنل خودکار دوباره وصل می‌شوند و مسیر اصلی (۲۱۰۰) تغییری نمی‌کند.</div></div>`;
+  },
+  settings(){
+    const p = themePref();
+    const btn = (id, label) => `<button class="chip ${p===id?'on':''}" data-theme-set="${id}">${label}</button>`;
+    return `<div class="two">
+      <div class="card"><h2>ظاهر</h2><div class="chips">${btn("light","روشن")}${btn("dark","تاریک")}${btn("auto","خودکار (مطابق سیستم)")}</div>
+        <div class="note">روشن = طرح ۱۳ (کارت‌های خطی، چهار شاخص در یک ردیف)؛ تاریک = طرح ۱۴ (کارت‌های تخت، شش شاخص در دو ردیف). سایدبار در هر دو سمت راست است.</div></div>
+      <div class="card"><h2>تغییر رمز</h2>
+        <div class="form">
+          <div><label for="pw_cur">رمز فعلی</label><input type="password" id="pw_cur" autocomplete="current-password"></div>
+          <div><label for="pw_new">رمز جدید (حداقل ۱۰ نویسه)</label><input type="password" id="pw_new" autocomplete="new-password"></div>
+          <div><label for="pw_new2">تکرار رمز جدید</label><input type="password" id="pw_new2" autocomplete="new-password"></div>
+          <div><button id="pwSave">ذخیره رمز</button></div>
+        </div><div id="pwMsg"></div></div>
+      <div class="card"><h2>نشست</h2><div class="note" style="margin:0 0 8px">کاربر: ${esc(DATA.me||"—")} — نشست ۱۲ ساعته؛ ۶ تلاش ناموفق در ۵ دقیقه قفل موقت می‌دهد.</div><button class="danger" id="logout2">خروج از حساب</button></div>
+    </div>`;
+  }
+};
+
+function render(){
+  if(!DATA) return;
+  const L = DATA.live, h = DATA.history || {};
+  $("#stamp").textContent = "آخرین به‌روزرسانی: " + L.now_utc + " UTC  |  آخرین ثبت مانیتور: " + ((L.monitor_last||{}).ts||"—");
+  $("#who").textContent = DATA.me ? ("کاربر: " + DATA.me) : "";
+  const bh = h.bucket_hours || 1;
+  const span = (h.from||"") + " تا " + (h.to||"");
+  $("#rangeNote").textContent = "بازه‌ی نمایش‌داده‌شده: " + span + " — هر نقطه = " + (bh===1?"۱ ساعت":bh+" ساعت") + ". داده از " + (h.first || "—") + " موجود است.";
+  if(h.first) $("#d_from").min = h.first;
+  if(h.from && document.activeElement !== $("#d_from")) $("#d_from").value = h.from;
+  if(h.to && document.activeElement !== $("#d_to")) $("#d_to").value = h.to;
+  $("#d_to").max = (L.now_utc||"").slice(0,10);
+  document.querySelectorAll("#presets .chip").forEach(b => b.classList.toggle("on", RANGE.days !== undefined && String(RANGE.days) === b.dataset.range));
+  markNav();
+  const fn = VIEWS[TAB] || VIEWS.overview;
+  // keep what the person is typing and the result messages across the periodic refresh
+  const keep = {};
+  if(TAB === "add") document.querySelectorAll("#view input").forEach(i => keep[i.id] = i.type==="checkbox" ? i.checked : i.value);
+  const msgs = {};
+  ["addMsg","userMsg"].forEach(id => { const el = document.getElementById(id); if(el) msgs[id] = el.innerHTML; });
+  if(h.error && ["overview","connections","dial","outages"].includes(TAB)){
+    $("#view").innerHTML = '<div class="card msg err">خطا در خواندن تاریخچه: ' + esc(h.error) + "</div>";
+  } else {
+    $("#view").innerHTML = fn(h);
+  }
+  if(TAB === "add"){
+    Object.entries(keep).forEach(([id,v]) => { const el = document.getElementById(id); if(el){ if(el.type==="checkbox") el.checked = v; else el.value = v; } });
+    syncMonthly();
+  }
+  Object.entries(msgs).forEach(([id,html]) => { const el = document.getElementById(id); if(el && html) el.innerHTML = html; });
+}
+function syncMonthly(){
+  const m = $("#f_monthly"), d = $("#f_days");
+  if(m && d){ d.disabled = m.checked; if(m.checked) d.value = 30; }
+}
+
+async function load(){
+  try{ DATA = await api("/api/overview?" + rangeQuery()); render(); }
+  catch(e){ $("#stamp").textContent = "خطا: " + e.message; }
+}
+
+function route(){
+  const id = (location.hash || "#overview").slice(1);
+  TAB = TABS.some(t => t.id === id) ? id : "overview";
+  markNav();
+  render();
+}
+
+/* ---------------------------------------------------------------- رویدادها */
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("button");
+  if(!t) return;
+  if(t.dataset.range !== undefined){ setRange({days: parseInt(t.dataset.range, 10)}); return; }
+  if(t.id === "d_apply"){
+    const f = $("#d_from").value, to = $("#d_to").value;
+    if(!f || !to){ $("#rangeNote").textContent = "هر دو تاریخ را انتخاب کنید."; return; }
+    if(f > to){ $("#rangeNote").textContent = "تاریخ شروع باید قبل از تاریخ پایان باشد."; return; }
+    setRange({from: f, to: to}); return;
+  }
+  if(t.dataset.themeSet){ setTheme(t.dataset.themeSet); return; }
+  if(t.id === "logout" || t.id === "logout2"){ try{ await api("/api/logout", POST()); }catch(e){} location.href = "/login"; return; }
+  if(t.id === "pwSave"){
+    const cur = $("#pw_cur").value, n1 = $("#pw_new").value, n2 = $("#pw_new2").value, m = $("#pwMsg");
+    if(n1 !== n2){ m.innerHTML = '<div class="msg err">تکرار رمز با رمز جدید یکی نیست</div>'; return; }
+    try{ await api("/api/password", POST({current: cur, new: n1})); m.innerHTML = '<div class="msg okk">رمز تغییر کرد.</div>';
+      $("#pw_cur").value = $("#pw_new").value = $("#pw_new2").value = ""; }
+    catch(e){ m.innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; }
+    return;
+  }
+  if(t.id === "add"){
+    t.disabled = true; t.textContent = "در حال ساخت… (تا ۳۰ ثانیه)";
+    const body = {name:$("#f_name").value.trim(), gb:$("#f_gb").value, days:$("#f_days").value, devices:$("#f_dev").value, monthly:$("#f_monthly").checked};
+    try{
+      const j = await api("/api/users", POST(body));
+      $("#addMsg").innerHTML = `<div class="msg okk">کاربر <b>${esc(j.name)}</b> ساخته شد. لینک را برای او بفرست:<div class="link">${esc(j.link)}</div><button class="ghost" id="cp">کپی لینک</button></div>`;
+      $("#cp").onclick = () => navigator.clipboard.writeText(j.link);
+      $("#f_name").value = ""; await load();
+    }catch(e){ $("#addMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+    const b = $("#add"); if(b){ b.disabled = false; b.textContent = "ساخت کانفیگ"; }
+    return;
+  }
+  if(t.dataset.link){
+    try{ const j = await api("/api/link?name="+encodeURIComponent(t.dataset.link));
+      $("#userMsg").innerHTML = `<div class="msg okk"><b>${esc(t.dataset.link)}</b><div class="link">${esc(j.link)}</div><button class="ghost" id="cp">کپی</button></div>`;
+      $("#cp").onclick = () => navigator.clipboard.writeText(j.link);
+    }catch(e){ $("#userMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+    return;
+  }
+  if(t.dataset.rm){
+    if(!confirm("کاربر «"+t.dataset.rm+"» حذف شود؟ پنل چند ثانیه ری‌استارت می‌شود.")) return;
+    t.disabled = true;
+    try{ await api("/api/users/remove", POST({name:t.dataset.rm})); await load(); }
+    catch(e){ alert(e.message); t.disabled = false; }
+  }
+});
+document.addEventListener("change", ev => { if(ev.target.id === "f_monthly") syncMonthly(); });
+$("#refresh").onclick = load;
+$("#themeBtn").onclick = () => setTheme(effTheme() === "dark" ? "light" : "dark");
+window.addEventListener("hashchange", route);
+
+buildNav();
+applyTheme();
+route();
+load();
+setInterval(() => { if(TAB !== "settings") load(); }, 60000);   // never wipe the password form while it is being typed
+</script>
+</body>
+</html>
